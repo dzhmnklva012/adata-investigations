@@ -14,7 +14,13 @@
       "Bash(gh --version)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m \"Initial Vite + React scaffold for Investigations module\")"
+      "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m \"Initial Vite + React scaffold for Investigations module\")",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run:*)",
+      "Bash(npm run:*)",
+      "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m 'feat: Investigations module \\(Compliance\\) — Tailwind + Lucide, RU UI:*)",
+      "Bash(git push:*)"
     ]
   }
 }
