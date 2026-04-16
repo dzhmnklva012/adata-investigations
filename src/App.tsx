@@ -884,6 +884,431 @@ function ComplaintRow({ complaint, onRemove }: { complaint: Complaint; onRemove?
   )
 }
 
+// ===================== Mock data for pickers =====================
+type DossierEmployee = {
+  id: string
+  fullName: string
+  iinBin: string
+  role: string
+  department: string
+  branch: string
+}
+
+const DOSSIER: DossierEmployee[] = [
+  { id: 'e-101', fullName: 'Иванов Сергей Петрович', iinBin: '880512300456', role: 'Менеджер CRM', department: 'Отдел продаж', branch: 'Алматы, ГО' },
+  { id: 'e-102', fullName: 'Сулейменова Айгуль Маратовна', iinBin: '910823400789', role: 'Администратор БД', department: 'ИТ', branch: 'Алматы, ГО' },
+  { id: 'e-103', fullName: 'Петров Артём Викторович', iinBin: '900312400123', role: 'Менеджер по продажам', department: 'Отдел продаж', branch: 'Шымкент' },
+  { id: 'e-104', fullName: 'Сидорова Елена Николаевна', iinBin: '920718500456', role: 'Старший менеджер', department: 'Отдел продаж', branch: 'Шымкент' },
+  { id: 'e-105', fullName: 'Касымова Аида Нурлановна', iinBin: '870204301122', role: 'Руководитель Compliance', department: 'Compliance', branch: 'Астана, ЦО' },
+  { id: 'e-106', fullName: 'Ермеков Дамир Ерланович', iinBin: '850619400234', role: 'Руководитель аудита', department: 'Аудит', branch: 'Астана, ЦО' },
+  { id: 'e-107', fullName: 'Алиева Мария Талгатовна', iinBin: '890914500321', role: 'HR-бизнес-партнёр', department: 'HR', branch: 'Алматы, ГО' },
+  { id: 'e-108', fullName: 'Турсунов Нурлан Кайратович', iinBin: '820115400567', role: 'Начальник СБ', department: 'Служба безопасности', branch: 'Алматы, ГО' },
+  { id: 'e-109', fullName: 'Жумабаев Санжар Ермекович', iinBin: '890722300998', role: 'Инженер ИБ', department: 'Информационная безопасность', branch: 'Астана, ЦО' },
+  { id: 'e-110', fullName: 'Ахметова Динара Берлановна', iinBin: '930509500221', role: 'Юрист', department: 'Юридический департамент', branch: 'Алматы, ГО' },
+  { id: 'e-111', fullName: 'Оспанов Руслан Аскарович', iinBin: '880227400774', role: 'Главный бухгалтер', department: 'Финансовый департамент', branch: 'Алматы, ГО' },
+  { id: 'e-112', fullName: 'Бекжанова Жанна Серикбаевна', iinBin: '900406500109', role: 'Кладовщик', department: 'Логистика', branch: 'Караганда' },
+]
+
+const ALL_COMPLAINTS: Complaint[] = [
+  { id: 'hl-921', number: 'HL-2026-00921', topic: 'Сообщение о возможной утечке клиентской базы из CRM', responsible: 'А. Касымова', date: '08.04.2026', channel: 'Горячая линия' },
+  { id: 'hl-917', number: 'HL-2026-00917', topic: 'Жалоба сотрудника на нарушение политики обработки ПДн', responsible: 'А. Касымова', date: '05.04.2026', channel: 'Email' },
+  { id: 'hl-912', number: 'HL-2026-00912', topic: 'Подозрение на коррупционные действия закупщика', responsible: 'Д. Ермеков', date: '28.03.2026', channel: 'Горячая линия' },
+  { id: 'hl-904', number: 'HL-2026-00904', topic: 'Конфликт интересов в тендерной комиссии', responsible: 'Д. Ермеков', date: '25.03.2026', channel: 'Форма на сайте' },
+  { id: 'hl-898', number: 'HL-2026-00898', topic: 'Жалоба на дискриминацию по признаку возраста', responsible: 'А. Касымова', date: '22.03.2026', channel: 'Email' },
+  { id: 'hl-889', number: 'HL-2026-00889', topic: 'Жалоба на регулярные опоздания коллег', responsible: 'М. Алиева', date: '01.04.2026', channel: 'Горячая линия' },
+  { id: 'hl-875', number: 'HL-2026-00875', topic: 'Сообщение о недостаче ТМЦ на складе №2', responsible: 'Н. Турсунов', date: '18.03.2026', channel: 'Горячая линия' },
+  { id: 'hl-861', number: 'HL-2026-00861', topic: 'Нарушение техники безопасности на производстве', responsible: 'Н. Турсунов', date: '10.03.2026', channel: 'Мобильное приложение' },
+]
+
+// ===================== Person Picker =====================
+function PersonPicker({
+  excludeIds,
+  onClose,
+  onAdd,
+}: {
+  excludeIds: Set<string>
+  onClose: () => void
+  onAdd: (persons: Person[]) => void
+}) {
+  const [mode, setMode] = useState<'dossier' | 'external'>('dossier')
+  const [search, setSearch] = useState('')
+  const [dept, setDept] = useState<string>('all')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [extIin, setExtIin] = useState('')
+  const [extName, setExtName] = useState('')
+
+  const departments = useMemo(() => ['all', ...Array.from(new Set(DOSSIER.map((d) => d.department)))], [])
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return DOSSIER.filter((e) => {
+      if (dept !== 'all' && e.department !== dept) return false
+      if (!q) return true
+      return e.fullName.toLowerCase().includes(q) || e.iinBin.includes(q) || e.role.toLowerCase().includes(q)
+    })
+  }, [search, dept])
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  const handleAddDossier = () => {
+    const persons: Person[] = Array.from(selected)
+      .map((id) => DOSSIER.find((d) => d.id === id))
+      .filter((x): x is DossierEmployee => Boolean(x))
+      .map((e) => ({ id: e.id, type: 'employee' as const, fullName: e.fullName, iinBin: e.iinBin, role: e.role, department: e.department }))
+    if (persons.length === 0) return
+    onAdd(persons)
+    onClose()
+  }
+
+  const extValid = extIin.trim().length >= 6 && extName.trim().length >= 2
+  const handleAddExternal = () => {
+    if (!extValid) return
+    onAdd([{ id: 'p-ext-' + Date.now(), type: 'external', fullName: extName.trim(), iinBin: extIin.trim() }])
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm">
+      <div className="min-h-full px-4 py-10">
+        <div className="mx-auto flex w-[880px] max-w-full flex-col rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-4">
+            <div>
+              <h3 className="text-[18px] font-bold text-slate-900">Добавить связанное лицо</h3>
+              <p className="mt-0.5 text-[12px] text-slate-500">Выберите сотрудников из Досье или добавьте внешнее лицо / организацию</p>
+            </div>
+            <button onClick={onClose} className="grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200">
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div className="border-b border-slate-100 px-6 py-3">
+            <div className="inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                onClick={() => setMode('dossier')}
+                className={`inline-flex min-w-[160px] items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold ${
+                  mode === 'dossier' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500'
+                }`}
+              >
+                <User className="size-4" />
+                Из Досье
+              </button>
+              <button
+                onClick={() => setMode('external')}
+                className={`inline-flex min-w-[160px] items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold ${
+                  mode === 'external' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500'
+                }`}
+              >
+                <Building2 className="size-4" />
+                Внешнее лицо
+              </button>
+            </div>
+          </div>
+
+          {mode === 'dossier' ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+                <div className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <Search className="size-4 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Поиск по ФИО, ИИН или должности"
+                    className="flex-1 bg-transparent text-sm outline-hidden placeholder:text-slate-400"
+                  />
+                </div>
+                <div className="relative">
+                  <select
+                    value={dept}
+                    onChange={(e) => setDept(e.target.value)}
+                    className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-[13px] font-medium text-slate-700 outline-hidden"
+                  >
+                    {departments.map((d) => (
+                      <option key={d} value={d}>
+                        {d === 'all' ? 'Все подразделения' : d}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+
+              <div className="max-h-[50vh] overflow-y-auto">
+                {filtered.length === 0 ? (
+                  <div className="grid place-items-center gap-1 px-4 py-10 text-center">
+                    <Search className="size-7 text-slate-300" />
+                    <div className="mt-1 text-[13px] font-medium text-slate-700">Никого не найдено</div>
+                    <div className="text-[12px] text-slate-400">Попробуйте изменить запрос или фильтр</div>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {filtered.map((e) => {
+                      const already = excludeIds.has(e.id)
+                      const isSelected = selected.has(e.id)
+                      return (
+                        <li key={e.id}>
+                          <button
+                            disabled={already}
+                            onClick={() => toggle(e.id)}
+                            className={`flex w-full items-center gap-3 px-6 py-3 text-left transition ${
+                              already ? 'cursor-not-allowed bg-slate-50/50 opacity-60' : isSelected ? 'bg-blue-50/60 hover:bg-blue-50' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className={`grid size-5 shrink-0 place-items-center rounded-md border ${isSelected ? 'border-blue-600 bg-blue-600 text-white' : already ? 'border-slate-300 bg-slate-200 text-slate-500' : 'border-slate-300 bg-white'}`}>
+                              {(isSelected || already) && <Check className="size-3.5" />}
+                            </div>
+                            <Avatar name={e.fullName} className="size-9 text-[11px]" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[13px] font-semibold text-slate-900">{e.fullName}</span>
+                                {already && <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">уже добавлен</span>}
+                              </div>
+                              <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
+                                <span>ИИН {e.iinBin}</span>
+                                <span className="text-slate-300">·</span>
+                                <span>{e.role}</span>
+                                <span className="text-slate-300">·</span>
+                                <span>{e.department}</span>
+                                <span className="text-slate-300">·</span>
+                                <span>{e.branch}</span>
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-slate-100 bg-slate-50 px-6 py-3">
+                <div className="text-[12px] text-slate-500">
+                  {selected.size > 0 ? (
+                    <>Выбрано: <b className="text-slate-900">{selected.size}</b></>
+                  ) : (
+                    <>Показано {filtered.length} из {DOSSIER.length} сотрудников</>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleAddDossier}
+                    disabled={selected.size === 0}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="size-4" />
+                    Добавить {selected.size > 0 && `(${selected.size})`}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4 px-6 py-5">
+                <Field label="ИИН / БИН" required>
+                  <input
+                    value={extIin}
+                    onChange={(e) => setExtIin(e.target.value)}
+                    placeholder="Напр.: 180440012345"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-hidden focus:border-blue-500 focus:ring-3 focus:ring-blue-500/10"
+                  />
+                </Field>
+                <Field label="ФИО / Наименование" required>
+                  <input
+                    value={extName}
+                    onChange={(e) => setExtName(e.target.value)}
+                    placeholder="Напр.: ТОО «ДатаКлауд Сервис» или Иванов И. И."
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-hidden focus:border-blue-500 focus:ring-3 focus:ring-blue-500/10"
+                  />
+                </Field>
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-[12px] text-amber-800">
+                  <Info className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <span>Внешние лица вводятся вручную и не связываются с Досье. Проверьте корректность ИИН/БИН.</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 rounded-b-2xl border-t border-slate-100 bg-slate-50 px-6 py-3">
+                <button onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+                  Отмена
+                </button>
+                <button
+                  disabled={!extValid}
+                  onClick={handleAddExternal}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="size-4" />
+                  Добавить лицо
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ===================== Complaint Picker =====================
+function ComplaintPicker({
+  excludeIds,
+  onClose,
+  onAdd,
+}: {
+  excludeIds: Set<string>
+  onClose: () => void
+  onAdd: (complaints: Complaint[]) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [channel, setChannel] = useState<string>('all')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  const channels = useMemo(() => ['all', ...Array.from(new Set(ALL_COMPLAINTS.map((c) => c.channel)))], [])
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return ALL_COMPLAINTS.filter((c) => {
+      if (channel !== 'all' && c.channel !== channel) return false
+      if (!q) return true
+      return c.number.toLowerCase().includes(q) || c.topic.toLowerCase().includes(q) || c.responsible.toLowerCase().includes(q)
+    })
+  }, [search, channel])
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  const handleAdd = () => {
+    const items = Array.from(selected)
+      .map((id) => ALL_COMPLAINTS.find((c) => c.id === id))
+      .filter((x): x is Complaint => Boolean(x))
+    if (items.length === 0) return
+    onAdd(items)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm">
+      <div className="min-h-full px-4 py-10">
+        <div className="mx-auto flex w-[880px] max-w-full flex-col rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-start justify-between gap-6 border-b border-slate-100 px-6 py-4">
+            <div>
+              <h3 className="text-[18px] font-bold text-slate-900">Привязать обращение</h3>
+              <p className="mt-0.5 text-[12px] text-slate-500">Выберите обращения из горячей линии, на основании которых ведётся расследование</p>
+            </div>
+            <button onClick={onClose} className="grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200">
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3">
+            <div className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <Search className="size-4 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по номеру, теме или ответственному"
+                className="flex-1 bg-transparent text-sm outline-hidden placeholder:text-slate-400"
+              />
+            </div>
+            <div className="relative">
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 pr-8 text-[13px] font-medium text-slate-700 outline-hidden"
+              >
+                {channels.map((c) => (
+                  <option key={c} value={c}>
+                    {c === 'all' ? 'Все каналы' : c}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            </div>
+          </div>
+
+          <div className="max-h-[50vh] overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="grid place-items-center gap-1 px-4 py-10 text-center">
+                <Search className="size-7 text-slate-300" />
+                <div className="mt-1 text-[13px] font-medium text-slate-700">Ничего не найдено</div>
+                <div className="text-[12px] text-slate-400">Попробуйте изменить запрос или фильтр</div>
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {filtered.map((c) => {
+                  const already = excludeIds.has(c.id)
+                  const isSelected = selected.has(c.id)
+                  return (
+                    <li key={c.id}>
+                      <button
+                        disabled={already}
+                        onClick={() => toggle(c.id)}
+                        className={`flex w-full items-start gap-3 px-6 py-3 text-left transition ${
+                          already ? 'cursor-not-allowed bg-slate-50/50 opacity-60' : isSelected ? 'bg-blue-50/60 hover:bg-blue-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border ${isSelected ? 'border-blue-600 bg-blue-600 text-white' : already ? 'border-slate-300 bg-slate-200 text-slate-500' : 'border-slate-300 bg-white'}`}>
+                          {(isSelected || already) && <Check className="size-3.5" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[13px] font-semibold text-blue-700">{c.number}</span>
+                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{c.channel}</span>
+                            <span className="text-[11px] text-slate-500">{c.date}</span>
+                            {already && <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">уже привязано</span>}
+                          </div>
+                          <div className="mt-1 text-[13px] text-slate-800">{c.topic}</div>
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+                            <User className="size-3 text-slate-400" />
+                            Ответственный: {c.responsible}
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-2xl border-t border-slate-100 bg-slate-50 px-6 py-3">
+            <div className="text-[12px] text-slate-500">
+              {selected.size > 0 ? (
+                <>Выбрано: <b className="text-slate-900">{selected.size}</b></>
+              ) : (
+                <>Показано {filtered.length} из {ALL_COMPLAINTS.length} обращений</>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50">
+                Отмена
+              </button>
+              <button
+                onClick={handleAdd}
+                disabled={selected.size === 0}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus className="size-4" />
+                Привязать {selected.size > 0 && `(${selected.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ===================== Create Modal =====================
 function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i: Investigation) => void }) {
   const [goal, setGoal] = useState('')
@@ -893,11 +1318,10 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i:
   const [description, setDescription] = useState('')
   const [files, setFiles] = useState<Attachment[]>([])
   const [persons, setPersons] = useState<Person[]>([])
-  const [personMode, setPersonMode] = useState<'employee' | 'external'>('employee')
-  const [extIin, setExtIin] = useState('')
-  const [extName, setExtName] = useState('')
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [showErrors, setShowErrors] = useState(false)
+  const [personPickerOpen, setPersonPickerOpen] = useState(false)
+  const [complaintPickerOpen, setComplaintPickerOpen] = useState(false)
 
   const errors = {
     goal: !goal.trim(),
@@ -932,13 +1356,6 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i:
       history: [{ when: new Date().toLocaleString('ru'), who: 'А. Касымова', action: 'Черновик создан' }],
     })
     onClose()
-  }
-
-  const addExternal = () => {
-    if (!extIin.trim() || !extName.trim()) return
-    setPersons((p) => [...p, { id: 'p-' + Date.now(), type: 'external', fullName: extName.trim(), iinBin: extIin.trim() }])
-    setExtIin('')
-    setExtName('')
   }
 
   return (
@@ -1048,119 +1465,70 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i:
 
         {/* Section 2 — Related persons */}
         <Section num={2} title="Связанные лица" desc="Сотрудники из Досье или внешние лица / организации">
-          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
-            <div className="inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                onClick={() => setPersonMode('employee')}
-                className={`inline-flex min-w-[160px] items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold ${
-                  personMode === 'employee' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500'
-                }`}
-              >
-                <User className="size-4" />
-                Из Досье
-              </button>
-              <button
-                onClick={() => setPersonMode('external')}
-                className={`inline-flex min-w-[160px] items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-semibold ${
-                  personMode === 'external' ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200' : 'text-slate-500'
-                }`}
-              >
-                <Building2 className="size-4" />
-                Внешнее лицо
-              </button>
-            </div>
-
-            {personMode === 'employee' ? (
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                <Search className="size-4 text-slate-400" />
-                <input placeholder="Поиск сотрудника по ИИН или ФИО в Досье" className="flex-1 bg-transparent text-sm outline-hidden placeholder:text-slate-400" />
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+            {persons.length > 0 ? (
+              <div className="space-y-2.5">
+                {persons.map((p) => (
+                  <PersonRow key={p.id} person={p} onRemove={() => setPersons((x) => x.filter((i) => i.id !== p.id))} />
+                ))}
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-[180px_1fr_auto]">
-                <input value={extIin} onChange={(e) => setExtIin(e.target.value)} placeholder="ИИН / БИН" className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-hidden focus:border-blue-500 focus:ring-3 focus:ring-blue-500/10" />
-                <input value={extName} onChange={(e) => setExtName(e.target.value)} placeholder="ФИО / Наименование" className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-hidden focus:border-blue-500 focus:ring-3 focus:ring-blue-500/10" />
-                <button onClick={addExternal} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
-                  <Plus className="size-4" />
-                  Добавить
-                </button>
+              <div className="grid place-items-center gap-1 rounded-lg bg-slate-50 px-4 py-8 text-center">
+                <Users className="size-7 text-slate-300" />
+                <div className="mt-1 text-[13px] font-medium text-slate-700">Пока нет связанных лиц</div>
+                <div className="text-[12px] text-slate-500">Добавьте сотрудников из Досье или внешних лиц</div>
               </div>
             )}
-
-            <div className="space-y-2.5">
-              {persons.map((p) => (
-                <PersonRow key={p.id} person={p} onRemove={() => setPersons((x) => x.filter((i) => i.id !== p.id))} />
-              ))}
-              {persons.length === 0 && <p className="text-center text-[13px] text-slate-400">Пока нет добавленных лиц</p>}
-            </div>
-
-            {personMode === 'employee' && (
-              <div className="space-y-2">
-                <div className="text-[12px] font-medium text-slate-500">Быстрый выбор из Досье</div>
-                <div className="grid gap-2">
-                  {[
-                    { id: 'e1', fullName: 'Иванов Сергей Петрович', iinBin: '880512300456', role: 'Менеджер CRM', department: 'Отдел продаж' },
-                    { id: 'e2', fullName: 'Сулейменова Айгуль Маратовна', iinBin: '910823400789', role: 'Администратор БД', department: 'ИТ' },
-                  ].map((e) => (
-                    <button
-                      key={e.id}
-                      onClick={() => setPersons((p) => (p.find((x) => x.id === e.id) ? p : [...p, { ...e, type: 'employee' as const }]))}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar name={e.fullName} className="size-9 text-[11px]" />
-                        <div>
-                          <div className="text-[13px] font-semibold text-slate-900">{e.fullName}</div>
-                          <div className="text-[11px] text-slate-500">
-                            ИИН {e.iinBin} · {e.role} · {e.department}
-                          </div>
-                        </div>
-                      </div>
-                      <Plus className="size-4 text-blue-600" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => setPersonPickerOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-[13px] font-semibold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50"
+            >
+              <Plus className="size-4" />
+              Добавить лицо
+            </button>
           </div>
         </Section>
 
         {/* Section 3 — complaints */}
         <Section num={3} title="Связанные обращения" desc="Обращения с горячей линии, на основании которых открыто расследование">
           <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-              <Search className="size-4 text-slate-400" />
-              <input placeholder="Найти обращение по номеру или ключевым словам" className="flex-1 bg-transparent text-sm outline-hidden placeholder:text-slate-400" />
-            </div>
-            <div className="space-y-2.5">
-              {complaints.map((c) => (
-                <ComplaintRow key={c.id} complaint={c} onRemove={() => setComplaints((p) => p.filter((x) => x.id !== c.id))} />
-              ))}
-            </div>
-            <div className="space-y-2">
-              <div className="text-[12px] font-medium text-slate-500">Быстрый выбор</div>
-              {[
-                { id: 'hl1', number: 'HL-2026-00921', topic: 'Сообщение о возможной утечке клиентской базы из CRM', responsible: 'А. Касымова', date: '08.04.2026', channel: 'Горячая линия' },
-                { id: 'hl2', number: 'HL-2026-00917', topic: 'Жалоба сотрудника на нарушение политики обработки ПДн', responsible: 'А. Касымова', date: '05.04.2026', channel: 'Email' },
-              ].map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setComplaints((p) => (p.find((x) => x.id === c.id) ? p : [...p, c]))}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-blue-700">{c.number}</span>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{c.channel}</span>
-                      <span className="text-[11px] text-slate-500">{c.date}</span>
-                    </div>
-                    <div className="mt-1 truncate text-[13px] text-slate-800">{c.topic}</div>
-                  </div>
-                  <Plus className="size-4 shrink-0 text-blue-600" />
-                </button>
-              ))}
-            </div>
+            {complaints.length > 0 ? (
+              <div className="space-y-2.5">
+                {complaints.map((c) => (
+                  <ComplaintRow key={c.id} complaint={c} onRemove={() => setComplaints((p) => p.filter((x) => x.id !== c.id))} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid place-items-center gap-1 rounded-lg bg-slate-50 px-4 py-8 text-center">
+                <MessageSquare className="size-7 text-slate-300" />
+                <div className="mt-1 text-[13px] font-medium text-slate-700">Нет связанных обращений</div>
+                <div className="text-[12px] text-slate-500">Выберите обращение из списка горячей линии</div>
+              </div>
+            )}
+            <button
+              onClick={() => setComplaintPickerOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-[13px] font-semibold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50"
+            >
+              <Plus className="size-4" />
+              Привязать обращение
+            </button>
           </div>
         </Section>
+
+        {personPickerOpen && (
+          <PersonPicker
+            excludeIds={new Set(persons.map((p) => p.id))}
+            onClose={() => setPersonPickerOpen(false)}
+            onAdd={(newPersons) => setPersons((p) => [...p, ...newPersons.filter((np) => !p.some((ex) => ex.id === np.id))])}
+          />
+        )}
+        {complaintPickerOpen && (
+          <ComplaintPicker
+            excludeIds={new Set(complaints.map((c) => c.id))}
+            onClose={() => setComplaintPickerOpen(false)}
+            onAdd={(newComplaints) => setComplaints((p) => [...p, ...newComplaints.filter((nc) => !p.some((ex) => ex.id === nc.id))])}
+          />
+        )}
 
         {/* Responsible auto */}
         <Section num={4} title="Ответственный" desc="Заполняется автоматически на основании профиля создающего">
@@ -1346,74 +1714,118 @@ function TabGeneral({ inv, isLocked, onUpdate }: { inv: Investigation; isLocked:
 }
 
 function TabPersons({ inv, isLocked, onUpdate }: { inv: Investigation; isLocked: boolean; onUpdate: (p: Partial<Investigation>) => void }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
   return (
-    <SubCard
-      title="Связанные лица"
-      count={inv.persons.length}
-      locked={isLocked}
-      action={
-        !isLocked && (
-          <button className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 hover:bg-blue-100">
-            <Plus className="size-3.5" />
-            Добавить лицо
-          </button>
-        )
-      }
-    >
-      {inv.persons.length > 0 ? (
-        <div className="space-y-2.5">
-          {inv.persons.map((p) => (
-            <PersonRow
-              key={p.id}
-              person={p}
-              onRemove={!isLocked ? () => onUpdate({ persons: inv.persons.filter((x) => x.id !== p.id) }) : undefined}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="grid place-items-center gap-1 rounded-lg bg-slate-50 px-4 py-10 text-center">
-          <Users className="size-8 text-slate-300" />
-          <div className="mt-1 text-[14px] font-semibold text-slate-700">Пока нет связанных лиц</div>
-          <div className="text-[12px] text-slate-500">Добавьте сотрудников из Досье или внешних лиц / организаций</div>
-        </div>
+    <>
+      <SubCard
+        title="Связанные лица"
+        count={inv.persons.length}
+        locked={isLocked}
+        action={
+          !isLocked && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 hover:bg-blue-100"
+            >
+              <Plus className="size-3.5" />
+              Добавить лицо
+            </button>
+          )
+        }
+      >
+        {inv.persons.length > 0 ? (
+          <div className="space-y-2.5">
+            {inv.persons.map((p) => (
+              <PersonRow
+                key={p.id}
+                person={p}
+                onRemove={!isLocked ? () => onUpdate({ persons: inv.persons.filter((x) => x.id !== p.id) }) : undefined}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid place-items-center gap-2 rounded-lg bg-slate-50 px-4 py-10 text-center">
+            <Users className="size-8 text-slate-300" />
+            <div className="mt-1 text-[14px] font-semibold text-slate-700">Пока нет связанных лиц</div>
+            <div className="text-[12px] text-slate-500">Добавьте сотрудников из Досье или внешних лиц / организаций</div>
+            {!isLocked && (
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700"
+              >
+                <Plus className="size-4" />
+                Добавить лицо
+              </button>
+            )}
+          </div>
+        )}
+      </SubCard>
+      {pickerOpen && !isLocked && (
+        <PersonPicker
+          excludeIds={new Set(inv.persons.map((p) => p.id))}
+          onClose={() => setPickerOpen(false)}
+          onAdd={(newPersons) => onUpdate({ persons: [...inv.persons, ...newPersons.filter((np) => !inv.persons.some((ex) => ex.id === np.id))] })}
+        />
       )}
-    </SubCard>
+    </>
   )
 }
 
 function TabComplaints({ inv, isLocked, onUpdate }: { inv: Investigation; isLocked: boolean; onUpdate: (p: Partial<Investigation>) => void }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
   return (
-    <SubCard
-      title="Связанные обращения"
-      count={inv.complaints.length}
-      locked={isLocked}
-      action={
-        !isLocked && (
-          <button className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 hover:bg-blue-100">
-            <Plus className="size-3.5" />
-            Привязать обращение
-          </button>
-        )
-      }
-    >
-      {inv.complaints.length > 0 ? (
-        <div className="space-y-2.5">
-          {inv.complaints.map((c) => (
-            <ComplaintRow
-              key={c.id}
-              complaint={c}
-              onRemove={!isLocked ? () => onUpdate({ complaints: inv.complaints.filter((x) => x.id !== c.id) }) : undefined}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="grid place-items-center gap-1 rounded-lg bg-slate-50 px-4 py-10 text-center">
-          <MessageSquare className="size-8 text-slate-300" />
-          <div className="mt-1 text-[14px] font-semibold text-slate-700">Нет связанных обращений</div>
-          <div className="text-[12px] text-slate-500">Выберите обращение из списка горячей линии</div>
-        </div>
+    <>
+      <SubCard
+        title="Связанные обращения"
+        count={inv.complaints.length}
+        locked={isLocked}
+        action={
+          !isLocked && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-[12px] font-medium text-blue-700 hover:bg-blue-100"
+            >
+              <Plus className="size-3.5" />
+              Привязать обращение
+            </button>
+          )
+        }
+      >
+        {inv.complaints.length > 0 ? (
+          <div className="space-y-2.5">
+            {inv.complaints.map((c) => (
+              <ComplaintRow
+                key={c.id}
+                complaint={c}
+                onRemove={!isLocked ? () => onUpdate({ complaints: inv.complaints.filter((x) => x.id !== c.id) }) : undefined}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid place-items-center gap-2 rounded-lg bg-slate-50 px-4 py-10 text-center">
+            <MessageSquare className="size-8 text-slate-300" />
+            <div className="mt-1 text-[14px] font-semibold text-slate-700">Нет связанных обращений</div>
+            <div className="text-[12px] text-slate-500">Выберите обращение из списка горячей линии</div>
+            {!isLocked && (
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-700"
+              >
+                <Plus className="size-4" />
+                Привязать обращение
+              </button>
+            )}
+          </div>
+        )}
+      </SubCard>
+      {pickerOpen && !isLocked && (
+        <ComplaintPicker
+          excludeIds={new Set(inv.complaints.map((c) => c.id))}
+          onClose={() => setPickerOpen(false)}
+          onAdd={(newComplaints) => onUpdate({ complaints: [...inv.complaints, ...newComplaints.filter((nc) => !inv.complaints.some((ex) => ex.id === nc.id))] })}
+        />
       )}
-    </SubCard>
+    </>
   )
 }
 

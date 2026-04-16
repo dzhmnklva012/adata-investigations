@@ -21,7 +21,8 @@
       "Bash(npm run:*)",
       "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m 'feat: Investigations module \\(Compliance\\) — Tailwind + Lucide, RU UI:*)",
       "Bash(git push:*)",
-      "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m 'refactor\\(detail\\): replace modal with full-page view:*)"
+      "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m 'refactor\\(detail\\): replace modal with full-page view:*)",
+      "Bash(git -c user.email=dzhmnklva012@users.noreply.github.com -c user.name=dzhmnklva012 commit -m 'feat: PersonPicker + ComplaintPicker with multi-select and search:*)"
     ]
   }
 }
