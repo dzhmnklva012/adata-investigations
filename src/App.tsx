@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowUpDown,
   BadgeCheck,
   Bell,
@@ -17,6 +18,7 @@ import {
   Eye,
   FileSignature,
   FileText,
+  History,
   Info,
   LayoutGrid,
   Link2,
@@ -24,6 +26,7 @@ import {
   MapPin,
   MessageSquare,
   MoreHorizontal,
+  Paperclip,
   PenLine,
   Play,
   Plus,
@@ -1562,9 +1565,63 @@ function TabResult({ inv, isLocked, onUpdate }: { inv: Investigation; isLocked: 
   )
 }
 
-function CardModal({
+// ===================== Detail Page (full-page view) =====================
+function PrimaryAction({
   inv,
-  onClose,
+  onStart,
+  onComplete,
+  onSign,
+  canComplete,
+}: {
+  inv: Investigation
+  onStart: () => void
+  onComplete: () => void
+  onSign: () => void
+  canComplete: boolean
+}) {
+  if (inv.status === 'draft')
+    return (
+      <button
+        onClick={onStart}
+        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+      >
+        <Play className="size-4" />
+        Начать расследование
+      </button>
+    )
+  if (inv.status === 'progress')
+    return (
+      <button
+        disabled={!canComplete}
+        onClick={onComplete}
+        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        title={canComplete ? '' : 'Заполните «Результат» и «Рекомендации»'}
+      >
+        <CheckCircle2 className="size-4" />
+        Завершить расследование
+      </button>
+    )
+  if (inv.status === 'completed')
+    return (
+      <button
+        onClick={onSign}
+        className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+      >
+        <FileSignature className="size-4" />
+        Подписать с ЭЦП
+      </button>
+    )
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+      <Lock className="size-3.5" />
+      Карточка заблокирована
+    </span>
+  )
+}
+
+function DetailPage({
+  inv,
+  onBack,
   onStart,
   onComplete,
   onSign,
@@ -1572,7 +1629,7 @@ function CardModal({
   onUpdate,
 }: {
   inv: Investigation
-  onClose: () => void
+  onBack: () => void
   onStart: () => void
   onComplete: () => void
   onSign: () => void
@@ -1585,60 +1642,35 @@ function CardModal({
   const canComplete =
     inv.status === 'progress' && (inv.result || '').trim().length > 0 && (inv.recommendations || '').trim().length > 0
 
-  return (
-    <Modal onClose={onClose} widthClass="w-[1200px]">
-      <div className="flex flex-col gap-4 px-8 pb-0 pt-6">
-        {isSigned && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
-            <div className="grid size-9 place-items-center rounded-full bg-emerald-500 text-white">
-              <BadgeCheck className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-semibold text-emerald-900">Расследование завершено и подписано ЭЦП</div>
-              <div className="mt-0.5 text-[12px] text-emerald-700">
-                Подписано: {inv.signedBy} · {inv.signedAt} · Сертификат №{inv.signature?.cert} — карточка переведена в режим только для чтения
-              </div>
-            </div>
-            <button className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-300 hover:bg-emerald-100">
-              <QrCode className="size-4" />
-              Скачать с QR
-            </button>
-          </div>
-        )}
-        {inv.status === 'completed' && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
-            <div className="grid size-9 place-items-center rounded-full bg-amber-500 text-white">
-              <FileSignature className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-semibold text-amber-900">Расследование завершено. Ожидается подпись ЭЦП</div>
-              <div className="mt-0.5 text-[12px] text-amber-700">Нажмите «Подписать с ЭЦП», чтобы сформировать итоговый отчёт и отправить на ЭДО API.</div>
-            </div>
-          </div>
-        )}
+  const order: Status[] = ['draft', 'progress', 'completed', 'signed']
+  const curIx = order.indexOf(inv.status)
 
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[12px] text-slate-400">
-              <span>Расследования</span>
+  const stats = [
+    { icon: Users, label: 'Связанных лиц', value: inv.persons.length },
+    { icon: MessageSquare, label: 'Обращений', value: inv.complaints.length },
+    { icon: Paperclip, label: 'Вложений', value: inv.attachments.length },
+    { icon: StickyNote, label: 'Заметок', value: inv.notes.length },
+  ]
+
+  return (
+    <>
+      {/* Sub-header: back, crumbs, right actions */}
+      <div className="sticky top-[65px] z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4 px-8 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <ArrowLeft className="size-4" />
+              Назад
+            </button>
+            <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-400">
+              <span>Главная</span>
               <ChevronRight className="size-3" />
-              <span className="font-medium text-slate-600">{inv.number}</span>
-            </div>
-            <h2 className="mt-1 flex flex-wrap items-center gap-3 text-[22px] font-bold text-slate-900">
-              {inv.goal}
-              <StatusBadge status={inv.status} size="md" />
-              {isLocked && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
-                  <Lock className="size-3" />
-                  Только чтение
-                </span>
-              )}
-            </h2>
-            <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-slate-500">
-              <span className="inline-flex items-center gap-1"><span className="text-slate-400">№</span>{inv.number}</span>
-              <span className="inline-flex items-center gap-1"><Calendar className="size-3.5 text-slate-400" />Создано {inv.createdDate}</span>
-              <span className="inline-flex items-center gap-1"><User className="size-3.5 text-slate-400" />{inv.responsible.name}</span>
-              <span className="inline-flex items-center gap-1"><Clock className="size-3.5 text-slate-400" />Обновлено {inv.updatedAt}</span>
+              <button onClick={onBack} className="hover:text-blue-700">Расследования</button>
+              <ChevronRight className="size-3" />
+              <span className="truncate font-semibold text-slate-700">{inv.number}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1648,212 +1680,313 @@ function CardModal({
             >
               <StickyNote className="size-4" />
               Заметки
-              {inv.notes.length > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600">{inv.notes.length}</span>}
+              {inv.notes.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600">{inv.notes.length}</span>
+              )}
             </button>
             <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
               {isSigned ? <QrCode className="size-4" /> : <Download className="size-4" />}
-              Скачать отчёт {isSigned && <span className="text-[11px] text-slate-400">(с QR)</span>}
+              Скачать отчёт
+              {isSigned && <span className="text-[11px] text-slate-400">(с QR)</span>}
             </button>
-            <button onClick={onClose} className="grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200">
-              <X className="size-4" />
-            </button>
+            <PrimaryAction inv={inv} onStart={onStart} onComplete={onComplete} onSign={onSign} canComplete={canComplete} />
           </div>
-        </div>
-
-        <div className="flex gap-6 overflow-x-auto border-b border-slate-200">
-          {([
-            { key: 'general', label: 'Общая информация', count: undefined },
-            { key: 'persons', label: 'Связанные лица', count: inv.persons.length },
-            { key: 'complaints', label: 'Связанные обращения', count: inv.complaints.length },
-            { key: 'result', label: 'Результат расследования', count: undefined },
-          ] as { key: Tab; label: string; count?: number }[]).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 whitespace-nowrap border-b-2 py-3.5 text-sm font-medium transition ${
-                tab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {t.label}
-              {t.count !== undefined && (
-                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tab === t.key ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                  {t.count}
-                </span>
-              )}
-            </button>
-          ))}
         </div>
       </div>
 
-      <div className="grid gap-6 px-8 pb-6 pt-6 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-5">
-          {tab === 'general' && <TabGeneral inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
-          {tab === 'persons' && <TabPersons inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
-          {tab === 'complaints' && <TabComplaints inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
-          {tab === 'result' && <TabResult inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
-        </div>
+      <main className="mx-auto max-w-[1440px] space-y-6 px-8 py-6">
+        {/* Banner */}
+        {isSigned && (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-emerald-50/40 p-4">
+            <div className="grid size-10 place-items-center rounded-full bg-emerald-500 text-white shadow-sm">
+              <BadgeCheck className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14px] font-semibold text-emerald-900">Расследование завершено и подписано ЭЦП</div>
+              <div className="mt-0.5 text-[12px] text-emerald-800/80">
+                Подписано: {inv.signedBy} · {inv.signedAt} · Сертификат №{inv.signature?.cert}
+              </div>
+            </div>
+            <button className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-300 hover:bg-emerald-100">
+              <QrCode className="size-4" />
+              Скачать с QR
+            </button>
+          </div>
+        )}
+        {inv.status === 'completed' && (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-amber-50/40 p-4">
+            <div className="grid size-10 place-items-center rounded-full bg-amber-500 text-white shadow-sm">
+              <FileSignature className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14px] font-semibold text-amber-900">Расследование завершено. Ожидается подпись ЭЦП</div>
+              <div className="mt-0.5 text-[12px] text-amber-800/80">Нажмите «Подписать с ЭЦП», чтобы сформировать итоговый отчёт и отправить на ЭДО API.</div>
+            </div>
+          </div>
+        )}
 
-        <aside className="space-y-5">
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h4 className="text-[14px] font-semibold text-slate-900">Статус расследования</h4>
-            <ol className="mt-3 space-y-0">
-              {(
-                [
-                  { key: 'draft', label: 'Черновик' },
-                  { key: 'progress', label: 'В работе' },
-                  { key: 'completed', label: 'Завершено' },
-                  { key: 'signed', label: 'Подписано ЭЦП' },
-                ] as { key: Status; label: string }[]
-              ).map((step, i, arr) => {
-                const order: Status[] = ['draft', 'progress', 'completed', 'signed']
-                const curIx = order.indexOf(inv.status)
-                const stIx = order.indexOf(step.key)
-                const state = stIx < curIx ? 'done' : stIx === curIx ? 'active' : 'pending'
-                const isLast = i === arr.length - 1
-                return (
-                  <li key={step.key} className="relative flex gap-3 pb-3 last:pb-0">
-                    <div className="flex flex-col items-center">
-                      <div className={`grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold ${state === 'done' ? 'bg-emerald-500 text-white' : state === 'active' ? 'bg-amber-500 text-white' : 'border border-slate-200 bg-slate-50 text-slate-400'}`}>
-                        {state === 'done' ? <Check className="size-3" /> : state === 'active' ? <Circle className="size-2 fill-current" /> : <Circle className="size-2" />}
-                      </div>
-                      {!isLast && <div className={`mt-1 w-0.5 flex-1 ${state === 'done' ? 'bg-emerald-200' : 'bg-slate-200'}`} />}
-                    </div>
-                    <div className="-mt-0.5 pb-1">
-                      <div className={`text-[13px] font-semibold ${state === 'pending' ? 'text-slate-400' : 'text-slate-900'}`}>{step.label}</div>
-                      <div className="text-[11px] text-slate-400">
-                        {step.key === inv.status && 'текущий этап'}
-                        {state === 'done' && 'пройден'}
-                        {state === 'pending' && 'ожидается'}
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
-            <div className="mt-4 border-t border-slate-100 pt-4">
-              {inv.status === 'draft' && (
-                <button onClick={onStart} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-                  <Play className="size-4" />
-                  Начать расследование
-                </button>
-              )}
-              {inv.status === 'progress' && (
-                <div className="space-y-2">
-                  <button
-                    disabled={!canComplete}
-                    onClick={onComplete}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="size-4" />
-                    Завершить расследование
-                  </button>
-                  {!canComplete && (
-                    <div className="inline-flex w-full items-start gap-1.5 rounded-md bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
-                      <AlertTriangle className="size-3.5 shrink-0" />
-                      <span>Заполните «Результат» и «Рекомендации» во вкладке «Результат расследования» перед завершением.</span>
-                    </div>
+        {/* Hero */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div className="relative border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white p-8">
+            <div className="flex flex-wrap items-start justify-between gap-6">
+              <div className="min-w-0 flex-1">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-900/90 px-2.5 py-1 font-mono text-[11px] font-semibold tracking-wide text-white">
+                    {inv.number}
+                  </span>
+                  <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">{inv.violationType}</span>
+                  <StatusBadge status={inv.status} size="md" />
+                  {isLocked && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">
+                      <Lock className="size-3" />
+                      Только чтение
+                    </span>
                   )}
                 </div>
-              )}
-              {inv.status === 'completed' && (
-                <button onClick={onSign} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
-                  <FileSignature className="size-4" />
-                  Подписать с ЭЦП
-                </button>
-              )}
-              {inv.status === 'signed' && (
-                <div className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700">
-                  <Lock className="size-3.5" />
-                  Карточка заблокирована
+                <h1 className="text-[30px] font-bold leading-tight tracking-tight text-slate-900">{inv.goal}</h1>
+                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-slate-600">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Calendar className="size-4 text-slate-400" />
+                    Событие: <b className="font-semibold text-slate-900">{inv.eventDate}</b>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="size-4 text-slate-400" />
+                    {inv.location || '—'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="size-4 text-slate-400" />
+                    Обновлено {inv.updatedAt}
+                  </span>
                 </div>
-              )}
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                <Avatar name={inv.responsible.name} className="size-11 text-sm" />
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Ответственный</div>
+                  <div className="text-[14px] font-semibold text-slate-900">{inv.responsible.name}</div>
+                  <div className="text-[12px] text-slate-500">{inv.responsible.role}</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {inv.attachments.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <h4 className="text-[14px] font-semibold text-slate-900">Вложения</h4>
-                {!isLocked && (
-                  <button className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-700 hover:underline">
-                    <Plus className="size-3.5" />
-                    Загрузить
-                  </button>
-                )}
-              </div>
-              <div className="mt-3 space-y-2">
-                {inv.attachments.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2.5 rounded-lg bg-slate-50 p-2.5">
-                    <FileIconTile kind={a.kind} className="size-7 text-[9px]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-medium text-slate-900">{a.name}</div>
-                      <div className="text-[10px] text-slate-400">{a.size}</div>
-                    </div>
-                    <button className="text-slate-400 hover:text-blue-700">
-                      <Download className="size-3.5" />
-                    </button>
+          {/* Horizontal stepper */}
+          <div className="grid grid-cols-4 border-b border-slate-100 bg-white">
+            {(
+              [
+                { key: 'draft', label: 'Черновик', sub: 'создание' },
+                { key: 'progress', label: 'В работе', sub: 'расследование' },
+                { key: 'completed', label: 'Завершено', sub: 'результат заполнен' },
+                { key: 'signed', label: 'Подписано ЭЦП', sub: 'отчёт в ЭДО' },
+              ] as { key: Status; label: string; sub: string }[]
+            ).map((step, i) => {
+              const stIx = order.indexOf(step.key)
+              const state = stIx < curIx ? 'done' : stIx === curIx ? 'active' : 'pending'
+              return (
+                <div key={step.key} className={`relative flex items-center gap-3 px-6 py-4 ${state === 'active' ? 'bg-blue-50/60' : ''}`}>
+                  <div
+                    className={`grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+                      state === 'done'
+                        ? 'bg-emerald-500 text-white'
+                        : state === 'active'
+                        ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                        : 'border border-slate-200 bg-slate-50 text-slate-400'
+                    }`}
+                  >
+                    {state === 'done' ? <Check className="size-4" /> : i + 1}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  <div className="min-w-0">
+                    <div className={`text-[13px] font-semibold ${state === 'pending' ? 'text-slate-400' : 'text-slate-900'}`}>{step.label}</div>
+                    <div className="text-[11px] text-slate-400">
+                      {state === 'active' ? 'текущий этап' : state === 'done' ? 'пройден' : step.sub}
+                    </div>
+                  </div>
+                  {i < 3 && (
+                    <div className={`absolute right-0 top-1/2 h-0.5 w-4 -translate-y-1/2 ${state === 'done' ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
 
-          {isSigned && inv.signature && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5">
-              <h4 className="text-[14px] font-semibold text-slate-900">Электронная подпись</h4>
-              <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="grid size-9 place-items-center rounded-full bg-indigo-600 text-white">
-                    <BadgeCheck className="size-5" />
+          {/* Quick stats strip */}
+          <div className="grid grid-cols-2 border-b border-slate-100 sm:grid-cols-4">
+            {stats.map((s, i) => {
+              const Ic = s.icon
+              return (
+                <div key={s.label} className={`flex items-center gap-3 px-6 py-4 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
+                  <div className="grid size-9 place-items-center rounded-lg bg-slate-50 text-slate-500">
+                    <Ic className="size-4" />
                   </div>
                   <div>
-                    <div className="text-[13px] font-semibold text-indigo-900">Подписано НУЦ РК</div>
-                    <div className="text-[11px] text-indigo-700">Действителен до {inv.signature.validUntil}</div>
+                    <div className="text-[20px] font-bold leading-none text-slate-900">{s.value}</div>
+                    <div className="mt-1 text-[11px] text-slate-500">{s.label}</div>
                   </div>
                 </div>
-                <dl className="mt-3 space-y-1.5 text-[11px]">
-                  {[
-                    ['Сертификат', inv.signature.cert],
-                    ['Подписант', inv.signedBy || ''],
-                    ['Дата подписания', inv.signedAt || ''],
-                    ['Хеш SHA-256', inv.signature.hash],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-3">
-                      <dt className="text-slate-500">{k}</dt>
-                      <dd className="text-right font-medium text-slate-900">{v}</dd>
+              )
+            })}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-8 overflow-x-auto px-8">
+            {([
+              { key: 'general', label: 'Общая информация', icon: FileText, count: undefined },
+              { key: 'persons', label: 'Связанные лица', icon: Users, count: inv.persons.length },
+              { key: 'complaints', label: 'Связанные обращения', icon: MessageSquare, count: inv.complaints.length },
+              { key: 'result', label: 'Результат расследования', icon: CheckCircle2, count: undefined },
+            ] as { key: Tab; label: string; icon: typeof FileText; count?: number }[]).map((t) => {
+              const Ic = t.icon
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`flex items-center gap-2 whitespace-nowrap border-b-2 py-4 text-sm font-medium transition ${
+                    tab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Ic className="size-4" />
+                  {t.label}
+                  {t.count !== undefined && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tab === t.key ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* Content grid */}
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-5">
+            {tab === 'general' && <TabGeneral inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
+            {tab === 'persons' && <TabPersons inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
+            {tab === 'complaints' && <TabComplaints inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
+            {tab === 'result' && <TabResult inv={inv} isLocked={isLocked} onUpdate={onUpdate} />}
+          </div>
+
+          <aside className="space-y-5">
+            {/* Action / status helper card */}
+            {inv.status === 'progress' && !canComplete && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <div>
+                    <div className="text-[13px] font-semibold text-amber-900">Требуется завершить заполнение</div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-amber-800/80">
+                      Чтобы завершить расследование, заполните «Результат» и «Рекомендации» на вкладке <b>«Результат расследования»</b>.
+                    </p>
+                    <button
+                      onClick={() => setTab('result')}
+                      className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-amber-900 hover:underline"
+                    >
+                      Перейти к результату
+                      <ChevronRight className="size-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isSigned && inv.signature && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5">
+                <h4 className="flex items-center gap-2 text-[14px] font-semibold text-slate-900">
+                  <FileSignature className="size-4 text-indigo-600" />
+                  Электронная подпись
+                </h4>
+                <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-10 place-items-center rounded-full bg-indigo-600 text-white shadow-sm">
+                      <BadgeCheck className="size-5" />
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-semibold text-indigo-900">Подписано НУЦ РК</div>
+                      <div className="text-[11px] text-indigo-700">Действителен до {inv.signature.validUntil}</div>
+                    </div>
+                  </div>
+                  <dl className="mt-3 space-y-1.5 text-[11px]">
+                    {[
+                      ['Сертификат', inv.signature.cert],
+                      ['Подписант', inv.signedBy || ''],
+                      ['Дата подписания', inv.signedAt || ''],
+                      ['Хеш SHA-256', inv.signature.hash],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-3">
+                        <dt className="text-slate-500">{k}</dt>
+                        <dd className="text-right font-medium text-slate-900">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            )}
+
+            {inv.attachments.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <h4 className="flex items-center gap-2 text-[14px] font-semibold text-slate-900">
+                    <Paperclip className="size-4 text-slate-400" />
+                    Вложения
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      {inv.attachments.length}
+                    </span>
+                  </h4>
+                  {!isLocked && (
+                    <button className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-700 hover:underline">
+                      <Plus className="size-3.5" />
+                      Загрузить
+                    </button>
+                  )}
+                </div>
+                <div className="mt-3 space-y-2">
+                  {inv.attachments.map((a) => (
+                    <div key={a.id} className="flex items-center gap-2.5 rounded-lg bg-slate-50 p-2.5">
+                      <FileIconTile kind={a.kind} className="size-7 text-[9px]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[12px] font-medium text-slate-900">{a.name}</div>
+                        <div className="text-[10px] text-slate-400">{a.size}</div>
+                      </div>
+                      <button className="text-slate-400 hover:text-blue-700">
+                        <Download className="size-3.5" />
+                      </button>
                     </div>
                   ))}
-                </dl>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h4 className="text-[14px] font-semibold text-slate-900">История изменений</h4>
-            <ol className="mt-3">
-              {inv.history.map((h, i) => {
-                const isLast = i === inv.history.length - 1
-                return (
-                  <li key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center pt-1">
-                      <div className="size-2.5 rounded-full bg-blue-600" />
-                      {!isLast && <div className="mt-1 w-0.5 flex-1 bg-slate-200" />}
-                    </div>
-                    <div className="pb-3.5">
-                      <div className="text-[11px] text-slate-400">{h.when}</div>
-                      <div className="text-[13px] font-medium text-slate-900">{h.action}</div>
-                      <div className="text-[11px] text-slate-500">{h.who}</div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
-          </div>
-        </aside>
-      </div>
-    </Modal>
+            <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <h4 className="flex items-center gap-2 text-[14px] font-semibold text-slate-900">
+                <History className="size-4 text-slate-400" />
+                История изменений
+              </h4>
+              <ol className="mt-3">
+                {inv.history.map((h, i) => {
+                  const isLast = i === inv.history.length - 1
+                  return (
+                    <li key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="size-2.5 rounded-full bg-blue-600" />
+                        {!isLast && <div className="mt-1 w-0.5 flex-1 bg-slate-200" />}
+                      </div>
+                      <div className="pb-3.5">
+                        <div className="text-[11px] text-slate-400">{h.when}</div>
+                        <div className="text-[13px] font-medium text-slate-900">{h.action}</div>
+                        <div className="text-[11px] text-slate-500">{h.who}</div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </>
   )
 }
+
 
 // ===================== Notes Drawer =====================
 function NotesDrawer({ inv, onClose, onAdd }: { inv: Investigation; onClose: () => void; onAdd: (text: string) => void }) {
@@ -1986,6 +2119,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
       <TopBar />
+      {selected ? (
+        <DetailPage
+          inv={selected}
+          onBack={() => setSelectedId(null)}
+          onStart={handleStart}
+          onComplete={handleComplete}
+          onSign={handleSign}
+          onOpenNotes={() => setNotesFor(selected.id)}
+          onUpdate={updateSelected}
+        />
+      ) : (
       <main className="mx-auto max-w-[1440px] space-y-6 px-8 py-8">
         <PageHeader onCreate={() => setCreateOpen(true)} />
         <Stats data={investigations} />
@@ -2047,22 +2191,12 @@ export default function App() {
           </div>
         </div>
       </main>
+      )}
 
       {createOpen && (
         <CreateModal
           onClose={() => setCreateOpen(false)}
           onCreate={(i) => setInvestigations((x) => [i, ...x])}
-        />
-      )}
-      {selected && (
-        <CardModal
-          inv={selected}
-          onClose={() => setSelectedId(null)}
-          onStart={handleStart}
-          onComplete={handleComplete}
-          onSign={handleSign}
-          onOpenNotes={() => setNotesFor(selected.id)}
-          onUpdate={updateSelected}
         />
       )}
       {notesInv && (
