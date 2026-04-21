@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { WorldCheckPage } from './WorldCheck'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -373,13 +374,12 @@ function FileIconTile({ kind, className = 'size-9 text-[10px]' }: { kind: Attach
 }
 
 // ===================== Top Bar =====================
-function TopBar() {
-  const navItems = [
-    { label: 'Главная', active: false },
-    { label: 'Досье', active: false },
-    { label: 'Обращения', active: false },
-    { label: 'Расследования', active: true },
-    { label: 'Отчёты', active: false },
+type AppPage = 'investigations' | 'worldcheck'
+
+function TopBar({ page, onNav }: { page: AppPage; onNav: (p: AppPage) => void }) {
+  const navItems: { label: string; page: AppPage }[] = [
+    { label: 'Расследования', page: 'investigations' },
+    { label: 'WorldCheck', page: 'worldcheck' },
   ]
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -396,9 +396,10 @@ function TopBar() {
         <nav className="hidden gap-1 md:flex">
           {navItems.map((n) => (
             <button
-              key={n.label}
+              key={n.page}
+              onClick={() => onNav(n.page)}
               className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                n.active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                page === n.page ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               {n.label}
@@ -2472,6 +2473,7 @@ function NotesDrawer({ inv, onClose, onAdd }: { inv: Investigation; onClose: () 
 
 // ===================== App =====================
 export default function App() {
+  const [page, setPage] = useState<AppPage>('investigations')
   const [investigations, setInvestigations] = useState<Investigation[]>(SAMPLE)
   const [filters, setFilters] = useState<Filters>({ search: '', status: 'all', violation: 'all', responsible: 'all', signed: 'all' })
   const [view, setView] = useState<'table' | 'cards'>('table')
@@ -2530,8 +2532,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
-      <TopBar />
-      {selected ? (
+      <TopBar page={page} onNav={(p) => { setPage(p); setSelectedId(null) }} />
+      {page === 'worldcheck' ? (
+        <WorldCheckPage />
+      ) : selected ? (
         <DetailPage
           inv={selected}
           onBack={() => setSelectedId(null)}
@@ -2605,13 +2609,13 @@ export default function App() {
       </main>
       )}
 
-      {createOpen && (
+      {page === 'investigations' && createOpen && (
         <CreateModal
           onClose={() => setCreateOpen(false)}
           onCreate={(i) => setInvestigations((x) => [i, ...x])}
         />
       )}
-      {notesInv && (
+      {page === 'investigations' && notesInv && (
         <NotesDrawer
           inv={notesInv}
           onClose={() => setNotesFor(null)}
